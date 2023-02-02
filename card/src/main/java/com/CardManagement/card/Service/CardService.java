@@ -12,8 +12,10 @@ import com.CardManagement.card.Io.AuthDto.TransactionRequest;
 import com.CardManagement.card.Io.Request.UpdateRequest;
 import com.CardManagement.card.Io.Response.CardResponse;
 import com.CardManagement.card.Model.Activity;
+import com.CardManagement.card.Model.Bill;
 import com.CardManagement.card.Model.Card;
 import com.CardManagement.card.Repository.ActivityRepository;
+import com.CardManagement.card.Repository.BillRepository;
 import com.CardManagement.card.Repository.CardRepository;
 import com.CardManagement.card.Utils.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,6 +77,9 @@ public class CardService{
 
     @Autowired
     private Email email;
+
+    @Autowired
+    private BillRepository billRepository;
 
     public CardResponse activateCard(CardRequest cardRequest, HttpServletRequest req){
         ClientResponse clientData = getClientDetails(req);
@@ -162,6 +167,7 @@ public class CardService{
     @Scheduled(cron = "0 0 0 25 * ?")
     public List<byte[]> generateBill(){
         List<Card> cardList = cardRepository.findAll();
+        saveBill(cardList);
         return generatePDF(cardList);
     }
 
@@ -261,10 +267,14 @@ public class CardService{
                 table.addCell("Date");
                 table.addCell("Reference");
                 for(Activity activity : card.getActivities()){
-                    table.addCell(activity.getCardDetails().getCardNumber());
-                    table.addCell(activity.getAmount().toString());
-                    table.addCell(activity.getDate().toString());
-                    table.addCell(activity.getReference());
+                    LocalDate targetDate = activity.getDate();
+                    LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(25);
+                    if(targetDate.isAfter(startDate)) {
+                        table.addCell(activity.getCardDetails().getCardNumber());
+                        table.addCell(activity.getAmount().toString());
+                        table.addCell(activity.getDate().toString());
+                        table.addCell(activity.getReference());
+                    }
                 }
                 Paragraph lastLine = new Paragraph("The total balance to be paid on or before "+card.getBillingDate().plusDays(card.getGracePeriod())+" is "+ card.getBalance()+".");
                 document.add(table);
@@ -322,5 +332,22 @@ public class CardService{
     public Card updateDate(Card card){
          card.setUpdatedAt(LocalDate.now());
          return card;
+    }
+
+    public void saveBill(List<Card> cardList){
+        cardList.forEach(card -> {
+            Bill bill = new Bill();
+            bill.setApr(card.getApr());
+            bill.setBalance(card.getBalance());
+            bill.setDate(LocalDate.now());
+            bill.setDueDate(card.getBillingDate().plusDays(card.getGracePeriod()));
+            card.getActivities().forEach(activity -> {
+                LocalDate targetDate = activity.getDate();
+                LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(25);
+                if(targetDate.isAfter(startDate)) {
+                    activity.setBill(bill);
+                }});
+            billRepository.save(bill);
+        });
     }
 }

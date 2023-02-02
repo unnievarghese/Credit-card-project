@@ -21,11 +21,8 @@ public class Bill implements Serializable {
     @Column(name = "bill_id")
     private Integer billId;
 
-    @Column(name = "reference")
-    private String reference;
-
     @Column(name = "balance")
-    private String balance;
+    private Float balance;
 
     @Column(name = "date")
     private LocalDate date;
