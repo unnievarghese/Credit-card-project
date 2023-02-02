@@ -6,7 +6,6 @@ import com.UBank.Auth.Util.ApiResponse;
 import com.UBank.Auth.Util.Constants;
 import com.UBank.Auth.Service.ClientService;
 import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;

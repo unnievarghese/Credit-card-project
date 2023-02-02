@@ -9,6 +9,7 @@ import com.CardManagement.card.Io.AuthDto.ClientResponse;
 import com.CardManagement.card.Io.Request.CardRequest;
 import com.CardManagement.card.Io.Request.PurchaseRequest;
 import com.CardManagement.card.Io.AuthDto.TransactionRequest;
+import com.CardManagement.card.Io.Request.UpdateRequest;
 import com.CardManagement.card.Io.Response.CardResponse;
 import com.CardManagement.card.Model.Activity;
 import com.CardManagement.card.Model.Card;
@@ -30,13 +31,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
-
 import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -83,14 +82,47 @@ public class CardService{
         return convertToResponse(card);
     }
 
+    public CardResponse updateCardDetails(UpdateRequest updateRequest, HttpServletRequest req, String cardNumber, Integer clientId) throws IllegalAccessException, NoSuchFieldException {
+        ClientResponse clientData = getClientById(req, clientId);
+        Card card = cardRepository.findByCrnAndCardNumber(clientData.getCrn(), cardNumber);
+        if (card != null) {
+            Field[] fields = updateRequest.getClass().getDeclaredFields();
+            for(Field field : fields){
+                field.setAccessible(true);
+                Object value = field.get(updateRequest);
+                Field targetField = card.getClass().getDeclaredField(field.getName());
+                targetField.setAccessible(true);
+                if(value != null)
+                    targetField.set(card, value);
+            };
+
+            card = updateDate(card);
+        }
+        return convertToResponse(save(card));
+    }
+
+    public String deactivateCard( String cardNumber, Integer clientId, HttpServletRequest req){
+        ClientResponse clientData = getClientById(req, clientId);
+        Card card = cardRepository.findByCrnAndCardNumber(clientData.getCrn(), cardNumber);
+        if(card != null) {
+            card.setIsDeactivated(true);
+            save(card);
+            return "Deactivation successful";
+        }
+        return "Deactivation unsuccessful";
+    }
+
     public CardResponse makePurchase(PurchaseRequest purchaseRequest, HttpServletRequest req) throws Exception {
         ClientResponse clientData = getClientDetails(req);
         Card card = cardRepository.findByCrnAndCardNumberAndCvvAndServiceCode(clientData.getCrn(), purchaseRequest.getCardNumber(),purchaseRequest.getCvv(),purchaseRequest.getServiceCode());
+        if(!checkCardStatus(card))
+            throw new Exception("Card deactivated!");
         if(!customPinAuthentication.authenticatePin(purchaseRequest, card))
             throw new Exception("pin does not match!");
         validatePayment(purchaseRequest, card);
         createActivity(purchaseRequest.getAmount(), card, PaymentType.CREDIT);
         card = updateCard(purchaseRequest, card);
+        card = updateDate(card);
         emailDriver(req, card, purchaseRequest.getAmount());
         return convertToResponse(card);
     }
@@ -107,6 +139,7 @@ public class CardService{
             card.setBalance(updatedBalance);
             createActivity(transactionRequest.getAmount(), card, PaymentType.DEBIT);
             emailDriver(req, card, transactionRequest.getAmount());
+            card = updateDate(card);
             return convertToResponse(save(card));
         }
         return new CardResponse();
@@ -119,6 +152,7 @@ public class CardService{
         Float updatedBalance = card.getBalance() - transactionRequest.getAmount();
         card.setCreditLimit(updatedLimit);
         card.setBalance(updatedBalance);
+        card = updateDate(card);
         save(card);
         emailDriver(req, card, transactionRequest.getAmount());
         createActivity(transactionRequest.getAmount(), card, PaymentType.CREDIT);
@@ -158,6 +192,7 @@ public class CardService{
         card.setMinimumPaymentPercent(utils.getMpp());
         card.setCreditLimit(utils.getCreditLimit());
         card.setBalance(0F);
+        card.setIsDeactivated(false);
         return card;
     }
 
@@ -180,6 +215,12 @@ public class CardService{
 
     public ClientResponse getClientDetails(HttpServletRequest req){
         LinkedHashMap response = authClient.getClientDetails(req.getHeader("Authorization"));
+        LinkedHashMap responseData = (LinkedHashMap) response.get("responseData");
+        return objectMapper.convertValue((LinkedHashMap) responseData.get("data"), ClientResponse.class);
+    }
+
+    public ClientResponse getClientById(HttpServletRequest req, Integer clientId){
+        LinkedHashMap response = authClient.getClientById(req.getHeader("Authorization"), clientId);
         LinkedHashMap responseData = (LinkedHashMap) response.get("responseData");
         return objectMapper.convertValue((LinkedHashMap) responseData.get("data"), ClientResponse.class);
     }
@@ -273,5 +314,13 @@ public class CardService{
                 throw new RuntimeException(e);
             }
         });
+    }
+    public Boolean checkCardStatus(Card card){
+        return !card.getIsDeactivated();
+    }
+
+    public Card updateDate(Card card){
+         card.setUpdatedAt(LocalDate.now());
+         return card;
     }
 }

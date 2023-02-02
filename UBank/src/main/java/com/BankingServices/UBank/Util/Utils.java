@@ -1,9 +1,6 @@
 package com.BankingServices.UBank.Util;
 
-import org.springframework.beans.factory.annotation.Value;
-
 import java.security.SecureRandom;
-import java.time.LocalDate;
 
 public class Utils {
 

@@ -1,7 +1,6 @@
 package com.UBank.Auth.Model;
 
 import lombok.Data;
-
 import javax.persistence.*;
 import java.util.Collection;
 

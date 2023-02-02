@@ -1,6 +1,5 @@
 package com.CardManagement.card.Email;
 
-import com.CardManagement.card.Io.Request.PurchaseRequest;
 import com.CardManagement.card.Model.Card;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;

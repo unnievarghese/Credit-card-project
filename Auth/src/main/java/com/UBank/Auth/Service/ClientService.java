@@ -1,12 +1,9 @@
 package com.UBank.Auth.Service;
 
 import com.UBank.Auth.IO.Request.ClientDetailsRequest;
-import com.UBank.Auth.IO.Request.ClientJobRequest;
 import com.UBank.Auth.IO.Response.ClientResponse;
-import com.UBank.Auth.Model.Authority;
 import com.UBank.Auth.Model.Client;
 import com.UBank.Auth.Model.Role;
-import com.UBank.Auth.Repository.AuthorityRepository;
 import com.UBank.Auth.Repository.ClientRepository;
 import com.UBank.Auth.Repository.RoleRepository;
 import com.UBank.Auth.Util.Utils;
@@ -20,9 +17,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import javax.servlet.http.HttpServletRequest;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 
 @Service
@@ -58,6 +53,7 @@ public class ClientService implements UserDetailsService {
         Client newClient = save(client);
         return convertToResponse(newClient);
     }
+
 
     public ClientResponse fetchClientById(Integer clientId){
         return convertToResponse(clientRepository.findById(clientId).get());

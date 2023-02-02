@@ -12,4 +12,7 @@ public interface AuthClient {
 
     @GetMapping(value = "/client/fetchByCrn")
     LinkedHashMap getClientDetailsByCrn(@RequestHeader("Authorization") String authorization, @RequestParam("crn") String crn);
+
+    @GetMapping(value = "/client/fetch")
+    LinkedHashMap getClientById(@RequestHeader("Authorization") String authorization, @RequestParam Integer clientId);
 }

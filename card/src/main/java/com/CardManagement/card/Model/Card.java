@@ -70,6 +70,11 @@ public class Card implements Serializable {
     @Column(name = "isDue")
     private Boolean isDue;
 
+
+    @Column(name = "isDeactivated")
+    private Boolean isDeactivated;
+
     @OneToMany(mappedBy="cardDetails",fetch = FetchType.EAGER)
     private List<Activity> activities;
+
 }
