@@ -18,6 +18,8 @@ public class WebSecurity extends WebSecurityConfigurerAdapter {
                 permitAll()
                 .antMatchers(HttpMethod.POST, SecurityConstant.GET_PAYMENT_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
                 .antMatchers(HttpMethod.GET, SecurityConstant.GENERATE_URL_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
+                .antMatchers(HttpMethod.GET, SecurityConstant.UPDATE_CARD_URL_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
+                .antMatchers(HttpMethod.GET, SecurityConstant.DEACTIVATE_CARD_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
                 .anyRequest().authenticated().
                 and().addFilter(new JwtAutheticationFilter(authenticationManager())).
                 sessionManagement().
