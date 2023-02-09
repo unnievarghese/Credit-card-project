@@ -11,19 +11,19 @@ public class WebSecurity extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        http.csrf().disable().authorizeRequests()
-                .antMatchers(HttpMethod.POST,SecurityConstant.SIGN_IN_URL).
-                permitAll()
-                .antMatchers(HttpMethod.POST,SecurityConstant.ADD_CLIENT_URL).
-                permitAll()
-                .antMatchers(HttpMethod.POST, SecurityConstant.GET_PAYMENT_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
-                .antMatchers(HttpMethod.GET, SecurityConstant.GENERATE_URL_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
-                .antMatchers(HttpMethod.GET, SecurityConstant.UPDATE_CARD_URL_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
-                .antMatchers(HttpMethod.GET, SecurityConstant.DEACTIVATE_CARD_URL).hasAnyAuthority("ROLE_ADMIN","ROLE_STAFF")
-                .anyRequest().authenticated().
-                and().addFilter(new JwtAutheticationFilter(authenticationManager())).
-                sessionManagement().
-                sessionCreationPolicy(SessionCreationPolicy.STATELESS).and().
-                exceptionHandling();
-    }
+            http.csrf().disable().authorizeRequests()
+                    .antMatchers(HttpMethod.POST, SecurityConstant.SIGN_IN_URL).
+                    permitAll()
+                    .antMatchers(HttpMethod.POST, SecurityConstant.ADD_CLIENT_URL).
+                    permitAll()
+                    .antMatchers(HttpMethod.POST, SecurityConstant.GET_PAYMENT_URL).hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
+                    .antMatchers(HttpMethod.GET, SecurityConstant.GENERATE_URL_URL).hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
+                    .antMatchers(HttpMethod.PATCH, SecurityConstant.UPDATE_CARD_URL_URL).hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
+                    .antMatchers(HttpMethod.GET, SecurityConstant.DEACTIVATE_CARD_URL).hasAnyAuthority("ROLE_ADMIN", "ROLE_STAFF")
+                    .anyRequest().authenticated().
+                    and().addFilter(new JwtAutheticationFilter(authenticationManager())).
+                    sessionManagement().
+                    sessionCreationPolicy(SessionCreationPolicy.STATELESS).and().
+                    exceptionHandling();
+        }
 }

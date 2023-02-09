@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "activity")
-public class Activity implements Serializable {
+public class Ledger implements Serializable {
 
     private static final long serialVersionUID = 3874754463294681918L;
 

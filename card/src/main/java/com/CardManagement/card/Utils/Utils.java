@@ -39,6 +39,10 @@ public class Utils {
         return gracePeriod;
     }
 
+    public Integer billingDay(){
+        return billingDate;
+    }
+
     public Float getApr(){
         return apr;
     }

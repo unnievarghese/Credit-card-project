@@ -75,6 +75,9 @@ public class Card implements Serializable {
     private Boolean isDeactivated;
 
     @OneToMany(mappedBy="cardDetails",fetch = FetchType.EAGER)
-    private List<Activity> activities;
+    private List<Ledger> activities;
+
+    @OneToMany(mappedBy="cardDetails",fetch = FetchType.EAGER)
+    private List<Bill> bills;
 
 }

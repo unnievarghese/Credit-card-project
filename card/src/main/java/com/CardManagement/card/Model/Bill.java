@@ -34,5 +34,9 @@ public class Bill implements Serializable {
     private Float apr;
 
     @OneToMany(mappedBy="bill")
-    private List<Activity> purchaseList;
+    private List<Ledger> purchaseList;
+
+    @ManyToOne
+    @JoinColumn(name="card_id")
+    private Card cardDetails;
 }

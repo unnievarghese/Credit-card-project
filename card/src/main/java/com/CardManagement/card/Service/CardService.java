@@ -11,7 +11,7 @@ import com.CardManagement.card.Io.Request.PurchaseRequest;
 import com.CardManagement.card.Io.AuthDto.TransactionRequest;
 import com.CardManagement.card.Io.Request.UpdateRequest;
 import com.CardManagement.card.Io.Response.CardResponse;
-import com.CardManagement.card.Model.Activity;
+import com.CardManagement.card.Model.Ledger;
 import com.CardManagement.card.Model.Bill;
 import com.CardManagement.card.Model.Card;
 import com.CardManagement.card.Repository.ActivityRepository;
@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Component
@@ -171,6 +172,12 @@ public class CardService{
         return generatePDF(cardList);
     }
 
+    @Scheduled(cron = "0 0 0 * * *")
+    public void dailyAudit(){
+        List<Card> cardList = cardRepository.findAll();
+        cardList.stream().filter(Card::getIsDue).findAny().ifPresent(card -> card.setBalance(card.getBalance()+((card.getBalance()*(card.getApr()/100))/365)));
+    }
+
     public Card save(Card card) {
         return cardRepository.save(card);
     }
@@ -238,13 +245,13 @@ public class CardService{
     }
 
     public void createActivity(Float amount, Card card, PaymentType paymentType){
-        Activity activity = new Activity();
-        activity.setCardDetails(card);
-        activity.setDate(LocalDate.now());
-        activity.setAmount(amount);
-        activity.setPaymentType(paymentType);
-        activity.setReference(paymentType.toString()+"_"+card.getCrn()+"_"+LocalDate.now());
-        activityRepository.save(activity);
+        Ledger ledger = new Ledger();
+        ledger.setCardDetails(card);
+        ledger.setDate(LocalDate.now());
+        ledger.setAmount(amount);
+        ledger.setPaymentType(paymentType);
+        ledger.setReference(paymentType.toString()+"_"+card.getCrn()+"_"+LocalDate.now());
+        activityRepository.save(ledger);
     }
 
     public List<byte[]> generatePDF(List<Card> cardList){
@@ -257,7 +264,7 @@ public class CardService{
                 document.open();
                 Font font = new Font();
                 font.setSize(14);
-                Paragraph paragraph = new Paragraph("Here is the list of all credit purchases from "+card.getBillingDate().minusMonths(1)+" to" +card.getBillingDate()+".", font);
+                Paragraph paragraph = new Paragraph("Here is the list of all credit purchases from "+LocalDate.now().minusMonths(1).withDayOfMonth(utils.billingDay())+" to" +LocalDate.now()+".", font);
                 paragraph.setSpacingAfter(15f);
                 document.add(paragraph);
                 PdfPTable table = new PdfPTable(4);
@@ -266,17 +273,17 @@ public class CardService{
                 table.addCell("Credited Amount");
                 table.addCell("Date");
                 table.addCell("Reference");
-                for(Activity activity : card.getActivities()){
-                    LocalDate targetDate = activity.getDate();
-                    LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(25);
+                for(Ledger ledger : card.getActivities()){
+                    LocalDate targetDate = ledger.getDate();
+                    LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(utils.billingDay());
                     if(targetDate.isAfter(startDate)) {
-                        table.addCell(activity.getCardDetails().getCardNumber());
-                        table.addCell(activity.getAmount().toString());
-                        table.addCell(activity.getDate().toString());
-                        table.addCell(activity.getReference());
+                        table.addCell(ledger.getCardDetails().getCardNumber());
+                        table.addCell(ledger.getAmount().toString());
+                        table.addCell(ledger.getDate().toString());
+                        table.addCell(ledger.getReference());
                     }
                 }
-                Paragraph lastLine = new Paragraph("The total balance to be paid on or before "+card.getBillingDate().plusDays(card.getGracePeriod())+" is "+ card.getBalance()+".");
+                Paragraph lastLine = new Paragraph("The total balance to be paid on or before "+LocalDate.now().withDayOfMonth(utils.billingDay()).plusDays(card.getGracePeriod())+" is "+ card.getBalance()+".");
                 document.add(table);
                 document.add(lastLine);
                 document.close();
@@ -305,8 +312,6 @@ public class CardService{
         for (byte[] data : out) {
             ZipArchiveEntry entry = new ZipArchiveEntry("file" + count + ".pdf");
             zaos.putArchiveEntry(entry);
-
-            // Write contents of the file
             zaos.write(data);
             zaos.closeArchiveEntry();
             count ++;
@@ -334,20 +339,53 @@ public class CardService{
          return card;
     }
 
+    public void updateBillingDate(Card card){
+        card.setBillingDate(LocalDate.now().withDayOfMonth(utils.billingDay()));
+        save(card);
+    }
+
     public void saveBill(List<Card> cardList){
         cardList.forEach(card -> {
-            Bill bill = new Bill();
-            bill.setApr(card.getApr());
-            bill.setBalance(card.getBalance());
-            bill.setDate(LocalDate.now());
-            bill.setDueDate(card.getBillingDate().plusDays(card.getGracePeriod()));
-            card.getActivities().forEach(activity -> {
-                LocalDate targetDate = activity.getDate();
-                LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(25);
-                if(targetDate.isAfter(startDate)) {
-                    activity.setBill(bill);
-                }});
-            billRepository.save(bill);
+            if(!card.getBills().isEmpty()){
+                updateBillingDate(card);
+
+                card.getBills().stream().filter(bill -> bill.getDate().isAfter(LocalDate.now().minusMonths(1).withDayOfMonth(utils.billingDay()))).findAny().ifPresentOrElse(
+                            bill -> {
+                                        bill.setBalance(card.getBalance());
+                                        billRepository.save(bill);
+                                    },
+                            ()->billRepository.save(createBillObject(card)));
+
+            }
+            else {
+                billRepository.save(createBillObject(card));
+            }
+        }
+        );
+    }
+
+    public Bill createBillObject(Card card){
+        Bill bill = new Bill();
+        bill.setApr(card.getApr());
+        bill.setBalance(card.getBalance());
+        bill.setDate(LocalDate.now());
+        bill.setDueDate(LocalDate.now().withDayOfMonth(utils.billingDay()).plusDays(card.getGracePeriod()));
+        bill.setCardDetails(card);
+        card.getActivities().forEach(ledger -> {
+            LocalDate targetDate = ledger.getDate();
+            LocalDate startDate = LocalDate.now().minusMonths(1).withDayOfMonth(utils.billingDay());
+            if(targetDate.isAfter(startDate)) {
+                ledger.setBill(bill);
+            }});
+        return bill;
+    }
+
+    @Scheduled(cron = "0 0 0 18 * ?")
+    public void dueDayAudit(){
+        List<Card> cardList = cardRepository.findAll();
+        cardList.forEach(card -> {
+            Float currentCycleBalance = (float) card.getActivities().stream().filter(activity -> activity.getDate().isAfter(LocalDate.now().minusMonths(1).withDayOfMonth(utils.billingDay()))).mapToDouble(Ledger :: getAmount).sum();
+            card.setIsDue(currentCycleBalance - card.getBalance() != 0);
         });
     }
 }
